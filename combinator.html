@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Combinator Selector</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/png" href="gambar/icon.png" sizes="16x16"/>
+        <style>
+            div p{
+                color: red;
+            }
+            div > p{
+                background-color: yellow;
+            }
+            div + p{
+                background-color: darkgrey;
+            }
+            div ~ p{
+                color: cyan;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <p>Ini adalah aturan CSS yang menetapkan warna teks merah untuk semua elemen p yang berada di dalam elemen div. Ini akan memengaruhi semua elemen p yang bersarang dalam elemen div, tidak peduli seberapa dalam mereka bersarang. </p>
+            <p>Ini adalah aturan CSS yang menetapkan warna latar belakang kuning untuk semua elemen p yang langsung berada di dalam elemen div. Ini berlaku hanya untuk elemen p yang menjadi anak langsung dari elemen div, bukan untuk yang bersarang lebih dalam.</p>
+        </div>
+        <p>Ini adalah aturan CSS yang menetapkan warna latar belakang abu-abu gelap untuk elemen p yang segera mengikuti (berada setelah) elemen div dalam struktur dokumen HTML. Ini berlaku hanya untuk elemen p yang langsung mengikuti elemen div.</p>
+        <p>Ini adalah aturan CSS yang menetapkan warna teks cyan untuk semua elemen p yang merupakan saudara kandung (berada di bawah elemen yang sama) dari elemen div. Ini berlaku untuk semua elemen p yang berada setelah elemen div dalam struktur dokumen HTML, dan mereka harus berada di bawah elemen yang sama.</p>    
+    </body>
+</html>
