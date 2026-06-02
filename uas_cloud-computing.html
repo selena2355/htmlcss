@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pantai Interaktif</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { overflow:hidden; width:100vw; height:100vh; user-select:none; }
+#scene { position:relative; width:100%; height:100%; overflow:hidden; }
+
+#sky { position:absolute; top:0; left:0; width:100%; height:68%; transition:background 0.8s ease; }
+
+#stars { position:absolute; top:0; left:0; width:100%; height:68%; pointer-events:none; opacity:0; transition:opacity 2s ease; }
+.star { position:absolute; background:white; border-radius:50%; animation:twinkle 2s infinite alternate; }
+@keyframes twinkle { from{opacity:0.2} to{opacity:1} }
+
+#horizon-glow { position:absolute; bottom:32%; left:0; width:100%; height:130px; pointer-events:none; opacity:0; z-index:4; transition:opacity 0.8s ease, background 0.8s ease; }
+
+/* SUN */
+#sun-wrap { position:absolute; z-index:10; transform:translate(-50%,-50%); cursor:grab; width:80px; height:80px; }
+#sun-wrap:active { cursor:grabbing; }
+#sun-body { position:absolute; top:50%; left:50%; width:70px; height:70px; border-radius:50%; transform:translate(-50%,-50%); background:radial-gradient(circle,#fff9c4 0%,#ffd700 45%,#ff8c00 100%); box-shadow:0 0 40px 14px rgba(255,210,50,.75),0 0 80px 30px rgba(255,150,20,.4); transition:box-shadow 1s ease, background 1s ease; }
+#sun-rays { position:absolute; top:50%; left:50%; width:0; height:0; animation:spinRays 10s linear infinite; }
+@keyframes spinRays { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.ray { position:absolute; height:3px; border-radius:3px; background:rgba(255,230,80,.55); top:-1.5px; }
+
+/* MOON */
+#moon-wrap { position:absolute; z-index:10; transform:translate(-50%,-50%); cursor:grab; width:70px; height:70px; opacity:0; transition:opacity 1.5s ease; }
+#moon-wrap:active { cursor:grabbing; }
+.moon-body { position:absolute; top:50%; left:50%; width:60px; height:60px; border-radius:50%; transform:translate(-50%,-50%); background:radial-gradient(circle at 38% 38%,#fffde7,#e4d8b0 60%,#c8b08a); box-shadow:0 0 20px 8px rgba(200,180,140,.5),inset -8px -8px 18px rgba(0,0,0,.18); overflow:hidden; }
+.crater { position:absolute; border-radius:50%; background:rgba(160,135,100,.28); }
+
+/* CLOUDS */
+.cloud { position:absolute; border-radius:50px; opacity:0; transition:opacity 1.5s ease, background 1.5s ease; animation:driftCloud linear infinite; }
+@keyframes driftCloud { from{transform:translateX(-250px)} to{transform:translateX(calc(100vw + 250px))} }
+
+/* BIRDS */
+.bird { position:absolute; z-index:11; pointer-events:none; opacity:0; transition:opacity 2s ease; animation:birdFly linear infinite; }
+.bird svg { animation:flapWings .45s ease-in-out infinite alternate; }
+@keyframes birdFly { from{transform:translateX(-120px)} to{transform:translateX(calc(100vw+120px))} }
+@keyframes flapWings { from{transform:scaleY(1)} to{transform:scaleY(-.35)} }
+
+/* SILHOUETTE */
+#silhouette { position:absolute; bottom:32%; left:0; width:100%; height:130px; pointer-events:none; z-index:5; }
+
+/* SEA */
+#sea { position:absolute; bottom:0; left:0; width:100%; height:38%; overflow:hidden; z-index:6; }
+#sea-base { position:absolute; top:0; left:0; width:100%; height:100%; transition:background 1s ease; }
+
+/* REFLECTION — on top of sea, below waves */
+#reflection { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; filter: blur(6px) saturate(0.85); opacity: 0.88; }
+
+.wave-layer { position:absolute; left:-100%; width:300%; height:70px; border-radius:50%; pointer-events:none; z-index:2; }
+.w1{top:-25px;animation:waveMove 5s ease-in-out infinite;}
+.w2{top:-12px;animation:waveMove 7s ease-in-out infinite reverse;opacity:.35;}
+.w3{top:2px;  animation:waveMove 9s ease-in-out infinite;opacity:.28;}
+.w4{top:14px; animation:waveMove 11s ease-in-out infinite reverse;opacity:.22;}
+@keyframes waveMove { 0%{transform:translateX(0)} 50%{transform:translateX(8%)} 100%{transform:translateX(0)} }
+
+.ripple-row { position:absolute; width:100%; height:2px; z-index:3; }
+.ripple-line { position:absolute; height:1px; border-radius:50%; animation:rippleAnim linear infinite; opacity:.3; }
+@keyframes rippleAnim { 0%{transform:scaleX(.8) translateX(0);opacity:.1} 50%{transform:scaleX(1.1) translateX(4px);opacity:.4} 100%{transform:scaleX(.8) translateX(0);opacity:.1} }
+
+/* SAND */
+#sand { position:absolute; bottom:0; left:0; width:100%; height:22%; z-index:8; overflow:hidden; transition:background 1s ease; }
+#sand-curve { position:absolute; top:0; left:0; width:100%; height:40px; }
+
+/* PALMS */
+.palm { position:absolute; bottom:0; z-index:9; pointer-events:none; }
+
+/* HUD */
+#hud { position:absolute; bottom:25%; left:50%; transform:translateX(-50%); z-index:20; display:flex; flex-direction:column; align-items:center; gap:4px; }
+#time-label { font:italic 15px Georgia,serif; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,.88); text-shadow:0 1px 6px rgba(0,0,0,.55); pointer-events:none; transition:color 1s ease; }
+#hint { font-size:11px; color:rgba(255,255,255,.5); letter-spacing:1px; text-shadow:0 1px 4px rgba(0,0,0,.5); pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="scene">
+  <div id="sky"></div>
+  <div id="stars"></div>
+  <div id="horizon-glow"></div>
+  <div id="clouds-container"></div>
+  <div id="birds-container"></div>
+
+  <div id="sun-wrap">
+    <div id="sun-rays"></div>
+    <div id="sun-body"></div>
+  </div>
+
+  <div id="moon-wrap">
+    <div class="moon-body">
+      <div class="crater" style="width:11px;height:11px;top:14px;left:17px"></div>
+      <div class="crater" style="width:7px;height:7px;top:34px;left:30px"></div>
+      <div class="crater" style="width:5px;height:5px;top:20px;left:39px"></div>
+    </div>
+  </div>
+
+  <canvas id="silhouette"></canvas>
+
+  <div id="sea">
+    <div id="sea-base"></div>
+    <canvas id="reflection"></canvas>
+    <div class="wave-layer w1" id="wave1"></div>
+    <div class="wave-layer w2" id="wave2"></div>
+    <div class="wave-layer w3" id="wave3"></div>
+    <div class="wave-layer w4" id="wave4"></div>
+    <div id="ripples"></div>
+  </div>
+
+  <div id="sand">
+    <canvas id="sand-curve"></canvas>
+  </div>
+
+  <div id="palms"></div>
+
+  <div id="hud">
+    <div id="time-label">Siang Hari</div>
+    <div id="hint">☀ Seret matahari atau 🌙 bulan</div>
+  </div>
+</div>
+
+<script>
+const W=()=>window.innerWidth, H=()=>window.innerHeight;
+const SKY_H=()=>H()*.68;
+
+function lerp(a,b,t){return a+(b-a)*t}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
+function lerpC(a,b,t){return[0,1,2].map(i=>Math.round(lerp(a[i],b[i],t)))}
+function rgb(c){return`rgb(${c[0]},${c[1]},${c[2]})`}
+function rgba(c,a){return`rgba(${c[0]},${c[1]},${c[2]},${a})`}
+
+// ── Sky / sea palettes keyed on sun angle (0..2π, 0=right horizon, π=left horizon)
+// We map sun angle to a "time t" 0..1 for palette lookup.
+// t=0: sun just risen (right), t=0.5: sun at top (noon), t=1: sun just set (left)
+// But we need night on both sides, so we use a folded mapping:
+// sunAngle in [0..2π], t = sunAngle/(2π) mapped to [0..1] cyclically.
+// We'll think in terms of sunAngle: 0=right, π/2=top, π=left, 3π/2=bottom(below horiz)
+// Visible range: sunAngle ∈ [0, π] (above horizon left to right)
+// For palette, let normA = sunAngle/π → 0=right horizon, 0.5=noon, 1=left horizon
+
+const SKY=[
+  {t:0.00,top:[4,4,25],     bot:[8,8,45],     lbl:'Malam Hari'},
+  {t:0.08,top:[18,18,55],   bot:[55,38,72],   lbl:'Dini Hari'},
+  {t:0.15,top:[70,45,70],   bot:[210,90,70],  lbl:'Fajar'},
+  {t:0.25,top:[110,155,195],bot:[250,175,95], lbl:'Pagi Hari'},
+  {t:0.40,top:[55,145,215], bot:[120,195,255],lbl:'Pagi Cerah'},
+  {t:0.50,top:[25,125,210], bot:[90,175,255], lbl:'Siang Hari'},
+  {t:0.60,top:[45,120,200], bot:[115,178,250],lbl:'Siang Hari'},
+  {t:0.75,top:[195,98,48],  bot:[252,158,78], lbl:'Sore Hari'},
+  {t:0.85,top:[175,55,28],  bot:[250,115,48], lbl:'Senja'},
+  {t:0.92,top:[75,28,55],   bot:[170,65,55],  lbl:'Magrib'},
+  {t:1.00,top:[4,4,25],     bot:[8,8,45],     lbl:'Malam Hari'},
+];
+const SEA=[
+  {t:0.00,d:[4,18,48],  s:[8,38,75]},
+  {t:0.15,d:[8,38,78],  s:[35,75,115]},
+  {t:0.25,d:[18,75,135],s:[75,135,175]},
+  {t:0.50,d:[8,58,128], s:[28,118,198]},
+  {t:0.75,d:[18,68,128],s:[58,118,178]},
+  {t:0.85,d:[58,38,58], s:[138,75,58]},
+  {t:0.92,d:[18,18,48], s:[58,38,68]},
+  {t:1.00,d:[4,18,48],  s:[8,38,75]},
+];
+
+function palAt(pal,t){
+  let i=0;
+  for(let k=0;k<pal.length-1;k++){if(t>=pal[k].t&&t<=pal[k+1].t){i=k;break;}}
+  const a=pal[i],b=pal[i+1],f=(t-a.t)/(b.t-a.t||1);
+  return{...a,...Object.fromEntries(Object.keys(a).map(k=>
+    Array.isArray(a[k])?[k,lerpC(a[k],b[k]??a[k],f)]:[k,f<.5?a[k]:b[k]??a[k]]
+  ))};
+}
+
+// ── CIRCLE MODEL ─────────────────────────────────────────────────────────
+// sunAngle in [0, 2π]. 0=right, π/2=top, π=left, 3π/2=underground
+// moonAngle = sunAngle + π  (always opposite)
+// Screen X = cos(angle) mapped: right→right, left→left
+//   screenX = W/2 - cos(angle)*W*0.48   (so 0=right maps to W, π=left maps to 0)
+// Screen Y = sky: only visible when angle ∈ (0,π), i.e. above horizon
+//   skyY = (1 - sin(angle)) * arcHeight  where arcHeight peaks at top of sky
+
+let sunAngle = Math.PI/2; // start: noon (top centre)
+let moonAngle = Math.PI + 0.1; // start: just below left horizon
+let moonDragged = false; // has user manually positioned moon?
+
+// Auto moon angle: rises from left as sun approaches left horizon
+// sunAngle 0=right, π/2=top, π=left
+// When sunAngle > π*0.7 (sun getting low on left), moon starts at left horizon (angle≈0.05)
+// and follows: moonAngle = π - sunAngle (mirror), clamped so moon rises as sun sets
+function autoMoonAngle(){
+  // Map sunAngle [0..π] → moonAngle
+  // When sun is at noon (π/2): moon below horizon (π+ε)
+  // When sun near left horizon (π): moon at left horizon (≈0.05) rising
+  // When sun underground (past π): moon follows from left toward center
+  const a = sunAngle;
+  if(a < Math.PI * 0.65){
+    // Sun still high/day: moon hidden below horizon
+    return Math.PI + 0.15;
+  } else {
+    // Sun setting: moon rises proportionally from left
+    // a goes from 0.65π to π → moon goes from below horizon (π+0.15) to left horizon (0.05)
+    const f = (a - Math.PI*0.65) / (Math.PI*0.35);
+    return lerp(Math.PI + 0.15, 0.05, clamp(f, 0, 1));
+  }
+}
+
+const RADIUS_X = 0.46; // fraction of W for horizontal span
+const PEAK_Y_FRAC = 0.12; // fraction of SKY_H at zenith
+
+function angleToScreen(angle){
+  // x: 0→right edge, π→left edge
+  const x = W()/2 - Math.cos(angle)*W()*RADIUS_X;
+  // y: visible when sin(angle) > 0
+  const sinA = Math.sin(angle);
+  // vertical: at sin=1 (top) → PEAK_Y_FRAC*SKY_H, at sin=0 (horizon) → SKY_H
+  const y = SKY_H() - sinA * SKY_H() * (1 - PEAK_Y_FRAC);
+  return {x, y, sinA};
+}
+
+// Visibility: how much above horizon (sinA > 0 means above)
+// We fade in/out near horizon (sinA close to 0)
+const FADE_SIN = 0.12;
+function horizFade(sinA){ return clamp(sinA/FADE_SIN,0,1); }
+
+// pallete t: based on sun angle normalised 0..1 (0=right horizon, 0.5=noon, 1=left horizon)
+// We fold the angle: when sun is underground use extrapolated night value
+function getPaletteT(){
+  // sunAngle mod 2π
+  let a = ((sunAngle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+  // 0=right, π/2=top, π=left, 3π/2..2π=underground
+  if(a <= Math.PI){
+    return a/Math.PI; // 0..1, 0=right(sunrise), 0.5=noon, 1=left(sunset)
+  } else {
+    // underground: night
+    // map 3π/2 → midnight (deepest night), interpolate to 0 and 2π
+    return 0; // full night
+  }
+}
+
+// More nuanced: when sun is underground, blend night based on how far below
+function getPaletteTFull(){
+  let a = ((sunAngle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+  if(a <= Math.PI) return a/Math.PI;
+  // underground: a in (π, 2π)
+  // π=just set, 3π/2=midnight, 2π=about to rise
+  // map to night t: just after set → 0.92 (magrib), midnight → 0, just before rise → 0.08
+  const u = (a - Math.PI)/Math.PI; // 0=just set, 1=just rising
+  if(u < 0.5){
+    return lerp(1.0, 0.0, u*2); // 1→0 (sunset to midnight)
+  } else {
+    return lerp(0.0, 0.0, (u-.5)*2); // stays at 0 (night)
+  }
+}
+
+// DOM
+const skyEl=document.getElementById('sky');
+const starsEl=document.getElementById('stars');
+const hglowEl=document.getElementById('horizon-glow');
+const sunWrap=document.getElementById('sun-wrap');
+const sunBody=document.getElementById('sun-body');
+const sunRays=document.getElementById('sun-rays');
+const moonWrap=document.getElementById('moon-wrap');
+const seaBase=document.getElementById('sea-base');
+const wave1=document.getElementById('wave1');
+const wave2=document.getElementById('wave2');
+const wave3=document.getElementById('wave3');
+const wave4=document.getElementById('wave4');
+const sandEl=document.getElementById('sand');
+const sandCurve=document.getElementById('sand-curve');
+const silCanvas=document.getElementById('silhouette');
+const silCtx=silCanvas.getContext('2d');
+const reflCanvas=document.getElementById('reflection');
+const reflCtx=reflCanvas.getContext('2d');
+const timeLabel=document.getElementById('time-label');
+const cloudsDiv=document.getElementById('clouds-container');
+const birdsDiv=document.getElementById('birds-container');
+const rippleDiv=document.getElementById('ripples');
+const palmsDiv=document.getElementById('palms');
+
+// Build rays
+const RAY_COUNT=12, RAY_R=44, RAY_LEN=18;
+for(let i=0;i<RAY_COUNT;i++){
+  const angle=i/RAY_COUNT*Math.PI*2;
+  const r=document.createElement('div');
+  r.className='ray';
+  r.style.cssText=`width:${RAY_LEN}px;left:${Math.cos(angle)*RAY_R}px;top:${Math.sin(angle)*RAY_R-1.5}px;transform:rotate(${angle}rad);transform-origin:0 50%`;
+  sunRays.appendChild(r);
+}
+
+function buildStars(){
+  starsEl.innerHTML='';
+  for(let i=0;i<130;i++){
+    const s=document.createElement('div'); s.className='star';
+    const sz=Math.random()*2.4+.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*95}%;animation-delay:${Math.random()*3}s;animation-duration:${1.5+Math.random()*2}s`;
+    starsEl.appendChild(s);
+  }
+}
+
+const CLOUD_DATA=[{top:7,w:165,h:52,delay:0,dur:48},{top:14,w:115,h:36,delay:-16,dur:57},{top:20,w:205,h:58,delay:-32,dur:66},{top:9,w:88,h:30,delay:-9,dur:42},{top:27,w:142,h:44,delay:-24,dur:52}];
+function buildClouds(){
+  cloudsDiv.innerHTML='';
+  CLOUD_DATA.forEach((d,i)=>{
+    const c=document.createElement('div');
+    c.className='cloud'; c.id=`cloud${i}`;
+    c.style.cssText=`top:${d.top}%;width:${d.w}px;height:${d.h}px;animation-delay:${d.delay}s;animation-duration:${d.dur}s;left:-250px`;
+    [[d.h*1.1,d.h*1.1,d.w*.2,-d.h*.4],[d.h*.8,d.h*.8,d.w*.5,-d.h*.25]].forEach(([bw,bh,bx,by])=>{
+      const b=document.createElement('div');
+      b.style.cssText=`position:absolute;border-radius:50%;width:${bw}px;height:${bh}px;left:${bx}px;top:${by}px;background:inherit`;
+      c.appendChild(b);
+    });
+    cloudsDiv.appendChild(c);
+  });
+}
+
+function buildBirds(){
+  birdsDiv.innerHTML='';
+  for(let i=0;i<5;i++){
+    const b=document.createElement('div'); b.className='bird'; b.id=`bird${i}`;
+    const top=8+Math.random()*32,dur=14+Math.random()*10,del=-(Math.random()*dur);
+    b.style.cssText=`top:${top}%;animation-duration:${dur}s;animation-delay:${del}s`;
+    b.innerHTML=`<svg width="20" height="10" viewBox="0 0 20 10"><path d="M0,6 Q5,0 10,6 Q15,0 20,6" stroke="rgba(0,0,0,.45)" stroke-width="1.5" fill="none"/></svg>`;
+    birdsDiv.appendChild(b);
+  }
+}
+
+function buildPalms(){
+  palmsDiv.innerHTML='';
+  [{left:4,sc:1.2,fl:false},{left:11,sc:.9,fl:true},{left:84,sc:1.1,fl:true},{left:90,sc:.85,fl:false}].forEach(c=>{
+    const d=document.createElement('div'); d.className='palm';
+    d.style.cssText=`left:${c.left}%;transform:scaleX(${c.fl?-1:1}) scale(${c.sc});transform-origin:bottom center`;
+    d.innerHTML=`<svg width="100" height="200" viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50,200 Q45,150 48,100 Q46,60 52,20" stroke="#4a3010" stroke-width="10" fill="none" stroke-linecap="round"/>
+      <path d="M52,22 Q18,-12 0,10" stroke="#256618" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M52,22 Q28,4 12,32"  stroke="#256618" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M52,22 Q50,-8 54,22" stroke="#256618" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M52,22 Q72,-8 92,5"  stroke="#256618" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M52,22 Q76,8 90,34"  stroke="#256618" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M52,22 Q67,32 72,52" stroke="#256618" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <circle cx="44" cy="28" r="5" fill="#6a4c1e"/>
+      <circle cx="54" cy="25" r="5" fill="#6a4c1e"/>
+    </svg>`;
+    palmsDiv.appendChild(d);
+  });
+}
+
+function buildRipples(){
+  rippleDiv.innerHTML='';
+  for(let row=0;row<10;row++){
+    const rd=document.createElement('div'); rd.className='ripple-row'; rd.style.top=`${8+row*9}%`;
+    for(let j=0;j<5+Math.floor(Math.random()*4);j++){
+      const l=document.createElement('div'); l.className='ripple-line';
+      l.style.cssText=`width:${30+Math.random()*120}px;left:${Math.random()*90}%;animation-duration:${2+Math.random()*3}s;animation-delay:${-Math.random()*3}s`;
+      rd.appendChild(l);
+    }
+    rippleDiv.appendChild(rd);
+  }
+}
+
+const SILO_PTS=[[0,95],[60,65],[130,80],[220,50],[320,70],[430,42],[540,60],[660,36],[780,62],[900,44],[1020,60],[1140,38],[1260,68],[1380,46],[1500,72],[1650,52],[1800,70],[1920,65]];
+function drawSilo(topC){
+  silCanvas.width=W(); silCanvas.height=130;
+  const dark=lerpC(topC,[0,0,0],.72);
+  const g=silCtx.createLinearGradient(0,0,0,130);
+  g.addColorStop(0,rgba(dark,.9)); g.addColorStop(1,rgba(dark,0));
+  silCtx.fillStyle=g;
+  silCtx.beginPath(); silCtx.moveTo(0,130);
+  SILO_PTS.forEach(([px,py])=>silCtx.lineTo(px/1920*W(),py));
+  silCtx.lineTo(W(),130); silCtx.closePath(); silCtx.fill();
+}
+
+function drawSandCurve(col){
+  sandCurve.width=W(); sandCurve.height=40;
+  const ctx=sandCurve.getContext('2d');
+  ctx.clearRect(0,0,W(),40);
+  const g=ctx.createLinearGradient(0,0,0,40);
+  g.addColorStop(0,rgba(col,0)); g.addColorStop(1,rgba(col,1));
+  ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(0,40);
+  ctx.bezierCurveTo(W()*.25,-4,W()*.75,28,W(),8);
+  ctx.lineTo(W(),40); ctx.closePath(); ctx.fill();
+}
+
+// Draw reflection inside the sea canvas
+function drawSeaReflection(sunScreen, sunSinA, moonScreen, moonSinA, pt){
+  const sw=W(), sh=reflCanvas.height;
+  reflCtx.clearRect(0,0,sw,sh);
+
+  const seaH = H()*.38; // sea element height
+  reflCanvas.width=sw; reflCanvas.height=seaH;
+  reflCtx.clearRect(0,0,sw,seaH);
+
+  function drawBeam(bx, sinA, warm){
+    if(sinA<=0) return;
+    const alpha=clamp(sinA,0,1);
+    // Vertical shimmer column from top of sea downward
+    const gr=reflCtx.createLinearGradient(bx,0,bx,seaH);
+    if(warm){
+      gr.addColorStop(0,`rgba(255,215,90,${.45*alpha})`);
+      gr.addColorStop(.25,`rgba(255,185,70,${.28*alpha})`);
+      gr.addColorStop(.6,`rgba(255,160,50,${.12*alpha})`);
+      gr.addColorStop(1,`rgba(255,140,40,0)`);
+    } else {
+      gr.addColorStop(0,`rgba(200,185,148,${.32*alpha})`);
+      gr.addColorStop(.25,`rgba(185,172,138,${.18*alpha})`);
+      gr.addColorStop(.6,`rgba(175,158,118,${.08*alpha})`);
+      gr.addColorStop(1,`rgba(175,158,118,0)`);
+    }
+    // Width of beam: narrower at top, wider at bottom (perspective) — extra wide for blur look
+    const topW=18, botW=W()*0.55;
+    reflCtx.beginPath();
+    reflCtx.moveTo(bx-topW/2, 0);
+    reflCtx.lineTo(bx+topW/2, 0);
+    reflCtx.lineTo(bx+botW/2, seaH);
+    reflCtx.lineTo(bx-botW/2, seaH);
+    reflCtx.closePath();
+    reflCtx.fillStyle=gr;
+    reflCtx.fill();
+
+    // Glitter lines across the beam — softer, fewer
+    reflCtx.save();
+    for(let i=0;i<10;i++){
+      const y=i*(seaH/10)+Math.sin(Date.now()*0.0008+i*0.7)*5;
+      const hw=topW/2+i*(botW-topW)/(10*2);
+      const lineAlpha = warm
+        ? (.22-i*.018)*alpha
+        : (.16-i*.013)*alpha;
+      if(lineAlpha<=0) continue;
+      reflCtx.strokeStyle=warm
+        ?`rgba(255,235,120,${lineAlpha})`
+        :`rgba(215,200,165,${lineAlpha})`;
+      reflCtx.lineWidth=1.5+Math.random()*1.2;
+      reflCtx.beginPath();
+      reflCtx.moveTo(bx-hw, y);
+      reflCtx.lineTo(bx+hw, y);
+      reflCtx.stroke();
+    }
+    reflCtx.restore();
+  }
+
+  drawBeam(sunScreen.x, sunSinA, true);
+  drawBeam(moonScreen.x, moonSinA, false);
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+function render(){
+  const t = getPaletteTFull();
+  const sc = palAt(SKY, t);
+  const se = palAt(SEA, t);
+
+  // How much above horizon is the sun?
+  const sunS  = angleToScreen(sunAngle);
+  // Use manual moonAngle if dragged, otherwise auto-follow sun
+  const effectiveMoonAngle = moonDragged ? moonAngle : autoMoonAngle();
+  const moonS = angleToScreen(effectiveMoonAngle);
+  const sunSinA  = Math.max(0, sunS.sinA);
+  const moonSinA = Math.max(0, moonS.sinA);
+
+  // nightF: 0 = full day, 1 = full night (sun underground)
+  const nightF = clamp(1 - sunSinA / FADE_SIN * 1.5, 0, 1);
+  const sunVis  = horizFade(sunS.sinA);
+  // Moon: visible above horizon, semi-transparent during twilight, solid at night
+  // moonHorizonFade = 0..1 based on moon height
+  // moonNightAlpha = 0.45 when sun just below horizon, 1.0 when fully night
+  const moonHorizonFade = horizFade(moonS.sinA);
+  const moonNightAlpha = clamp(0.45 + nightF * 0.55, 0, 1);
+  const moonVis = moonHorizonFade * moonNightAlpha;
+
+  // ─ sky ─
+  skyEl.style.background=`linear-gradient(to bottom,${rgb(sc.top)},${rgb(sc.bot)})`;
+
+  // ─ stars ─
+  starsEl.style.opacity=nightF.toFixed(3);
+
+  // ─ horizon glow ─
+  const dawnF  = t>0.10&&t<0.35 ? clamp((t-.10)/.1,0,1)*clamp((.35-t)/.1,0,1) : 0;
+  const duskF  = t>0.65&&t<0.95 ? clamp((t-.65)/.1,0,1)*clamp((.95-t)/.1,0,1) : 0;
+  hglowEl.style.opacity=Math.max(dawnF,duskF).toFixed(3);
+  hglowEl.style.background=t<.5
+    ?'linear-gradient(to top,rgba(255,110,40,.75),transparent)'
+    :'linear-gradient(to top,rgba(255,75,25,.82),transparent)';
+
+  // ─ clouds ─
+  const dayF=clamp(t<.5?(t-.12)/.13:(.88-t)/.13,0,.9);
+  let cr=255,cg=255,cb=255;
+  if(t<.25){cr=255;cg=175;cb=135;}
+  else if(t<.42){cr=255;cg=238;cb=215;}
+  else if(t<.62){cr=255;cg=255;cb=255;}
+  else if(t<.8){cr=255;cg=198;cb=158;}
+  else{cr=198;cg=115;cb=95;}
+  document.querySelectorAll('.cloud').forEach(c=>{
+    c.style.opacity=dayF.toFixed(3);
+    c.style.background=`rgba(${cr},${cg},${cb},.88)`;
+  });
+
+  // ─ birds ─
+  const birdF=clamp(t<.5?(t-.22)/.1:(.78-t)/.1,0,1);
+  document.querySelectorAll('.bird').forEach(b=>b.style.opacity=(birdF*.9).toFixed(3));
+
+  // ─ sun ─
+  sunWrap.style.left=sunS.x+'px';
+  sunWrap.style.top=sunS.y+'px';
+  sunWrap.style.opacity=sunVis.toFixed(3);
+
+  let sbg,sg1,sg2;
+  if(t<.2||t>.8){
+    sbg='radial-gradient(circle,#ffe0a0 0%,#ff8800 40%,#ff4400 100%)';
+    sg1='rgba(255,90,25,.8)';sg2='rgba(255,55,5,.35)';
+  } else if(t<.4||t>.65){
+    sbg='radial-gradient(circle,#fff5c5 0%,#ffc800 40%,#ff9500 100%)';
+    sg1='rgba(255,155,45,.75)';sg2='rgba(255,115,18,.38)';
+  } else {
+    sbg='radial-gradient(circle,#fffaaa 0%,#ffd700 40%,#ff8c00 100%)';
+    sg1='rgba(255,218,72,.75)';sg2='rgba(255,155,18,.38)';
+  }
+  sunBody.style.background=sbg;
+  sunBody.style.boxShadow=`0 0 40px 14px ${sg1},0 0 80px 28px ${sg2}`;
+
+  // ─ moon ─
+  moonWrap.style.left=moonS.x+'px';
+  moonWrap.style.top=moonS.y+'px';
+  moonWrap.style.opacity=moonVis.toFixed(3);
+
+  // ─ sea ─
+  seaBase.style.background=`linear-gradient(to bottom,${rgb(se.s)},${rgb(se.d)})`;
+  const wc=lerpC(se.s,[255,255,255],.28);
+  [wave1,wave2,wave3,wave4].forEach(w=>w.style.background=`radial-gradient(ellipse at center,${rgba(wc,.42)},${rgba(se.s,0)})`);
+  document.querySelectorAll('.ripple-line').forEach(r=>r.style.background=rgb(lerpC(se.s,[255,255,255],.55)));
+
+  // ─ sea reflection (inside sea element) ─
+  drawSeaReflection(sunS, sunSinA*sunVis, moonS, moonSinA*moonVis, t);
+
+  // ─ sand ─
+  let stc,sbc;
+  if(nightF>.5){stc=[55,50,35];sbc=[38,32,22];}
+  else if(t<.3){stc=[198,148,78];sbc=[155,118,58];}
+  else if(t<.7){stc=[238,208,148];sbc=[208,175,108];}
+  else{stc=[198,138,68];sbc=[158,108,48];}
+  sandEl.style.background=`linear-gradient(to bottom,${rgb(stc)},${rgb(sbc)})`;
+  drawSandCurve(stc);
+
+  // ─ silhouette ─
+  drawSilo(sc.top);
+
+  // ─ label ─
+  timeLabel.textContent=sc.lbl;
+}
+
+// ── DRAG ──────────────────────────────────────────────────────────────────
+// Strategy: on mousedown, record the angle that corresponds to current pointer X.
+// On move, compute the angle for the new pointer X and set sunAngle accordingly.
+// This makes the object "stick" under the cursor perfectly.
+let dragTarget=null;
+
+function screenXToAngle(px){
+  // Inverse of angleToScreen: x = W/2 - cos(a)*W*RADIUS_X
+  // cos(a) = (W/2 - x) / (W*RADIUS_X)
+  const cosA = clamp((W()/2 - px) / (W()*RADIUS_X), -1, 1);
+  // We want the angle in [0,π] (above horizon arc)
+  // acos returns [0,π] which matches our visible arc perfectly
+  return Math.acos(cosA);
+}
+
+function startDrag(e, target){
+  dragTarget=target;
+  if(target==='moon') moonDragged = true;
+  e.preventDefault();
+}
+function onMove(e){
+  if(!dragTarget) return;
+  const ev=e.touches?e.touches[0]:e;
+  const px = ev.clientX;
+  // Convert pointer X directly to the corresponding arc angle
+  const arcAngle = screenXToAngle(px);
+  if(dragTarget==='sun'){
+    sunAngle = arcAngle;
+  } else {
+    moonAngle = arcAngle;
+  }
+  render();
+  e.preventDefault();
+}
+function stopDrag(){ dragTarget=null; }
+
+sunWrap.addEventListener('mousedown', e=>startDrag(e,'sun'));
+sunWrap.addEventListener('touchstart',e=>startDrag(e,'sun'),{passive:false});
+moonWrap.addEventListener('mousedown',e=>startDrag(e,'moon'));
+moonWrap.addEventListener('touchstart',e=>startDrag(e,'moon'),{passive:false});
+window.addEventListener('mousemove', onMove);
+window.addEventListener('touchmove', onMove,{passive:false});
+window.addEventListener('mouseup', stopDrag);
+window.addEventListener('touchend', stopDrag);
+
+window.addEventListener('resize', render);
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+buildStars(); buildClouds(); buildBirds(); buildPalms(); buildRipples();
+render();
+
+// animation loop for shimmer
+(function loop(){
+  const ema = moonDragged ? moonAngle : autoMoonAngle();
+  if(!dragTarget) drawSeaReflection(
+    angleToScreen(sunAngle), Math.max(0,Math.sin(sunAngle))*horizFade(Math.sin(sunAngle)),
+    angleToScreen(ema), Math.max(0,Math.sin(ema))*horizFade(Math.sin(ema)),
+    getPaletteTFull()
+  );
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
